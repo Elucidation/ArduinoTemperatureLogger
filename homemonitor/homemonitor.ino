@@ -14,13 +14,28 @@ Temperature Monitoring system
 #include <SD.h> // Modified SD.cpp in SD library to allow for multiple SD.begin() calls
 // Add to Line 343 of SD.cpp: 'if (root.isOpen()) {root.close();}'
 
+#include <ThermistorSensor.h>
+
+// Thermistor Setup
+// which analog pins to connect
+#define THERMISTOR_PIN_A A0
+#define THERMISTOR_PIN_B A1
+
+// Thermistor objects and temperature variables
+ThermistorSensor thermistorA(THERMISTOR_PIN_A);
+ThermistorSensor thermistorB(THERMISTOR_PIN_B);
+
+#define FILENAME "mtest.txt"
 File myFile;
-void readFileToSerial()
+
+void readFileToSerial(char* filename)
 {
   // re-open the file for reading:
-  myFile = SD.open("mtest.txt");
+  myFile = SD.open(filename);
   if (myFile) {
-    Serial.println("mtest.txt:");
+    Serial.print("Reading ");
+    Serial.print(filename);
+    Serial.println(":");
     
     // read from the file until there's nothing else in it:
     while (myFile.available()) {
@@ -30,7 +45,7 @@ void readFileToSerial()
     myFile.close();
   } else {
   	// if the file didn't open, print an error:
-    Serial.println("error opening mtest.txt");
+    Serial.println("error opening for reading");
   }
 }
 
@@ -56,9 +71,6 @@ void logToFile(char* filename, int value)
     myFile.println(value);
     myFile.close();
     
-    // Update counter
-    counter++;
-    
     Serial.println("done.");
   } else {
     // if the file didn't open, print an error:
@@ -68,6 +80,13 @@ void logToFile(char* filename, int value)
 
 boolean startSD()
 {
+  Serial.print("Initializing SD card...");
+  // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
+  // Note that even if it's not used as the CS pin, the hardware SS pin 
+  // (10 on most Arduino boards, 53 on the Mega) must be left as an output 
+  // or the SD library functions will not work. 
+  pinMode(10, OUTPUT);
+
   if (!SD.begin(4)) {
     Serial.println("initialization failed!");
     return false;
@@ -77,52 +96,49 @@ boolean startSD()
 }
 
 boolean buttonPressed = false;
-void doButtonPressed()
+void buttonInterrupt()
 {
   buttonPressed = true;
 }
 
+void doButtonCall()
+{
+  delay(250);
+  Serial.println("Woo");
+  if (startSD())
+  {
+    // Read thermistors
+    int tempA = thermistorA.getReading();
+    int tempB = thermistorB.getReading();
+
+    logToFile(FILENAME, tempA);
+    logToFile(FILENAME, tempB);
+    readFileToSerial(FILENAME);
+  }
+  buttonPressed = false;
+
+}
+
 void setup()
 {
- // Open serial communications and wait for port to open:
-  Serial.begin(9600);
-  while (!Serial) {
-    ; // wait for serial port to connect. Needed for Leonardo only
-  }
+  Serial.begin(9600);  
+  
+  // if (!startSD())
+  // {
+  //   return;
+  // }
+  
+  // logToFile(FILENAME, counter);  
+  // readFileToSerial(FILENAME);
 
-
-  Serial.print("Initializing SD card...");
-  // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
-  // Note that even if it's not used as the CS pin, the hardware SS pin 
-  // (10 on most Arduino boards, 53 on the Mega) must be left as an output 
-  // or the SD library functions will not work. 
-   pinMode(10, OUTPUT);
-  
-  if (!startSD())
-  {
-    return;
-  }
-  
-  logToFile("mtest.txt", counter);
-  
-  readFileToSerial();
-  
-  // Trigger backlight on push button on pin 2 (interrupt 0)
-  attachInterrupt(0, doButtonPressed, RISING);
+  attachInterrupt(0, buttonInterrupt, RISING);
 }
 
 void loop()
 {
   if (buttonPressed)
   {
-    delay(250);
-    Serial.println("Woo");
-    if (startSD())
-    {
-      logToFile("mtest.txt", counter);
-      readFileToSerial();
-    }
-    buttonPressed = false;
+    doButtonCall();
   }
 }
 
