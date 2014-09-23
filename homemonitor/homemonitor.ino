@@ -1,32 +1,26 @@
 /*
-  SD card read/write
- 
- This example shows how to read and write data to and from an SD card file 	
+Temperature Monitoring system
+
  The circuit:
  * SD card attached to SPI bus as follows:
  ** MOSI - pin 11
  ** MISO - pin 12
  ** CLK - pin 13
  ** CS - pin 4
- 
- created   Nov 2010
- by David A. Mellis
- modified 9 Apr 2012
- by Tom Igoe
- 
- This example code is in the public domain.
- 	 
+
+  filename has to be short :\ *NOTE*
+
  */
- 
-#include <SD.h>
+#include <SD.h> // Modified SD.cpp in SD library to allow for multiple SD.begin() calls
+// Add to Line 343 of SD.cpp: 'if (root.isOpen()) {root.close();}'
 
 File myFile;
 void readFileToSerial()
 {
   // re-open the file for reading:
-  myFile = SD.open("test.txt");
+  myFile = SD.open("mtest.txt");
   if (myFile) {
-    Serial.println("test.txt:");
+    Serial.println("mtest.txt:");
     
     // read from the file until there's nothing else in it:
     while (myFile.available()) {
@@ -36,7 +30,39 @@ void readFileToSerial()
     myFile.close();
   } else {
   	// if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
+    Serial.println("error opening mtest.txt");
+  }
+}
+
+int counter = 0;
+
+// Append int value to file
+void logToFile(char* filename, int value)
+{
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  myFile = SD.open(filename, FILE_WRITE);
+  
+  // if the file opened okay, write to it:
+  if (myFile) {
+    // Serial info
+    Serial.print("Writing ");
+    Serial.print(value);
+    Serial.print(" to ");
+    Serial.print(filename);
+    Serial.print("... ");
+    
+    // Write value to file and close
+    myFile.println(value);
+    myFile.close();
+    
+    // Update counter
+    counter++;
+    
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening for writing.");
   }
 }
 
@@ -60,7 +86,7 @@ void setup()
 {
  // Open serial communications and wait for port to open:
   Serial.begin(9600);
-   while (!Serial) {
+  while (!Serial) {
     ; // wait for serial port to connect. Needed for Leonardo only
   }
 
@@ -77,21 +103,7 @@ void setup()
     return;
   }
   
-  // open the file. note that only one file can be open at a time,
-  // so you have to close this one before opening another.
-  myFile = SD.open("test.txt", FILE_WRITE);
-  
-  // if the file opened okay, write to it:
-  if (myFile) {
-    Serial.print("Writing to test.txt...");
-    myFile.println("testing 1, 2, 3.");
-	// close the file:
-    myFile.close();
-    Serial.println("done.");
-  } else {
-    // if the file didn't open, print an error:
-    Serial.println("error opening test.txt");
-  }
+  logToFile("mtest.txt", counter);
   
   readFileToSerial();
   
@@ -107,6 +119,7 @@ void loop()
     Serial.println("Woo");
     if (startSD())
     {
+      logToFile("mtest.txt", counter);
       readFileToSerial();
     }
     buttonPressed = false;
