@@ -1,18 +1,23 @@
 /*
 Temperature Monitoring system
 
- The circuit:
- * SD card attached to SPI bus as follows:
- ** MOSI - pin 11
- ** MISO - pin 12
- ** CLK - pin 13
- ** CS - pin 4
+The circuit:
+* SD card attached to SPI bus as follows:
+** MOSI - pin 11
+** MISO - pin 12
+** CLK - pin 13
+** CS - pin 4
 
-  filename has to be short :\ *NOTE*
+filename has to be short :\ *NOTE*
 
- */
+*/
 #include <SD.h> // Modified SD.cpp in SD library to allow for multiple SD.begin() calls
 // Add to Line 343 of SD.cpp: 'if (root.isOpen()) {root.close();}'
+
+#include <Time.h>
+#include <TimeAlarms.h>
+#include <Wire.h>
+#include <DS1307RTC.h>
 
 #include <ThermistorSensor.h>
 
@@ -78,6 +83,45 @@ void logToFile(char* filename, int value)
   }
 }
 
+// Log time to file
+void logTimeToFile(char* filename)
+{
+  // open the file. note that only one file can be open at a time,
+  // so you have to close this one before opening another.
+  myFile = SD.open(filename, FILE_WRITE);
+  
+  // if the file opened okay, write to it:
+  if (myFile) {
+    // Serial info
+    Serial.print("Writing '");
+    Serial.print(month());
+    Serial.print(" ");
+    Serial.print(day());
+    Serial.print(" ");
+    Serial.print(hour());
+    Serial.print(" ");
+    Serial.print(minute());
+    Serial.print("' to ");
+    Serial.print(filename);
+    Serial.print("... ");
+    
+    // Write value to file and close
+    myFile.print(month());
+    myFile.print(" ");
+    myFile.print(day());
+    myFile.print(" ");
+    myFile.print(hour());
+    myFile.print(" ");
+    myFile.print(minute());
+    myFile.close();
+    
+    Serial.println("done.");
+  } else {
+    // if the file didn't open, print an error:
+    Serial.println("error opening for writing.");
+  }
+}
+
 boolean startSD()
 {
   Serial.print("Initializing SD card...");
@@ -101,7 +145,8 @@ void buttonInterrupt()
   buttonPressed = true;
 }
 
-void doButtonCall()
+// Read and record data to log files
+void recordData()
 {
   delay(250);
   Serial.println("Woo");
@@ -111,9 +156,17 @@ void doButtonCall()
     int tempA = thermistorA.getReading();
     int tempB = thermistorB.getReading();
 
-    logToFile(FILENAME, tempA);
-    logToFile(FILENAME, tempB);
-    readFileToSerial(FILENAME);
+    // Log Time & Temperature
+    logTimeToFile("time.txt");
+    logToFile("T_in.txt", tempA);
+    logToFile("T_out.txt", tempB);
+
+    Serial.println("time.txt: ");
+    readFileToSerial("time.txt");
+    Serial.println("T_in.txt: ");
+    readFileToSerial("T_in.txt");
+    Serial.println("T_out.txt: ");
+    readFileToSerial("T_out.txt");
   }
   buttonPressed = false;
 
@@ -121,25 +174,28 @@ void doButtonCall()
 
 void setup()
 {
-  Serial.begin(9600);  
-  
-  // if (!startSD())
-  // {
-  //   return;
-  // }
-  
-  // logToFile(FILENAME, counter);  
-  // readFileToSerial(FILENAME);
+  Serial.begin(9600);
+  setSyncProvider(RTC.get); // get time from Real Time Clock
+  if(timeStatus()!= timeSet)
+    Serial.println("Unable to sync with the RTC");
+  else
+    Serial.println("RTC has set the system time");
 
+  // Set button to write to file
   attachInterrupt(0, buttonInterrupt, RISING);
+
+  // Set call to update files every minute
+  Alarm.timerRepeat(10, recordData);
 }
 
 void loop()
 {
   if (buttonPressed)
   {
-    doButtonCall();
+    recordData();
   }
+
+  Alarm.delay(1000); // Check every second
 }
 
 
