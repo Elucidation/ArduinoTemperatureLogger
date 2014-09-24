@@ -12,6 +12,8 @@ filename has to be short :\ *NOTE*
 
 */
 
+// #define SERIAL_OUTPUT // for debugging
+
 // SD storage stuff
 #include <SD.h> // Modified SD.cpp in SD library to allow for multiple SD.begin() calls
 // Add to Line 343 of SD.cpp: 'if (root.isOpen()) {root.close();}'
@@ -63,6 +65,7 @@ void lcdPrintLeadingZerosInt(int value)
   }
 }
 
+#ifdef SERIAL_OUTPUT
 void readFileToSerial(char* filename)
 {
   // re-open the file for reading:
@@ -83,6 +86,7 @@ void readFileToSerial(char* filename)
     Serial.println("error opening for reading");
   }
 }
+#endif
 
 // Append float value to file
 void logToFile(char* filename, float value)
@@ -93,21 +97,27 @@ void logToFile(char* filename, float value)
   
   // if the file opened okay, write to it:
   if (myFile) {
+    #ifdef SERIAL_OUTPUT
     // Serial info
     Serial.print("Writing ");
     Serial.print(value);
     Serial.print(" to ");
     Serial.print(filename);
     Serial.print("... ");
+    #endif
     
     // Write value to file and close
     myFile.println(value);
     myFile.close();
     
+    #ifdef SERIAL_OUTPUT
     Serial.println("done.");
+    #endif
   } else {
     // if the file didn't open, print an error:
+    #ifdef SERIAL_OUTPUT
     Serial.println("error opening for writing.");
+    #endif
   }
 }
 
@@ -120,6 +130,7 @@ void logTimeToFile(char* filename)
   
   // if the file opened okay, write to it:
   if (myFile) {
+    #ifdef SERIAL_OUTPUT
     // Serial info
     Serial.print("Writing '");
     Serial.print(month());
@@ -132,6 +143,7 @@ void logTimeToFile(char* filename)
     Serial.print("' to ");
     Serial.print(filename);
     Serial.print("... ");
+    #endif
     
     // Write value to file and close
     myFile.print(month());
@@ -143,16 +155,22 @@ void logTimeToFile(char* filename)
     myFile.println(minute());
     myFile.close();
     
+    #ifdef SERIAL_OUTPUT
     Serial.println("done.");
+    #endif
   } else {
     // if the file didn't open, print an error:
+    #ifdef SERIAL_OUTPUT
     Serial.println("error opening for writing.");
+    #endif
   }
 }
 
 boolean startSD()
 {
+  #ifdef SERIAL_OUTPUT
   Serial.print("Initializing SD card...");
+  #endif
   // On the Ethernet Shield, CS is pin 4. It's set as an output by default.
   // Note that even if it's not used as the CS pin, the hardware SS pin 
   // (10 on most Arduino boards, 53 on the Mega) must be left as an output 
@@ -160,10 +178,14 @@ boolean startSD()
   pinMode(10, OUTPUT);
 
   if (!SD.begin(4)) {
+    #ifdef SERIAL_OUTPUT
     Serial.println("initialization failed!");
+    #endif
     return false;
   }
+  #ifdef SERIAL_OUTPUT
   Serial.println("initialization done.");
+  #endif
   return true;
 }
 
@@ -185,7 +207,6 @@ void updateTemperatures()
 void recordData()
 {
   delay(250);
-  Serial.println("Woo");
   if (startSD())
   {
     SDCardExists = true;
@@ -197,12 +218,14 @@ void recordData()
     logToFile("T_in.txt", tempA);
     logToFile("T_out.txt", tempB);
 
+    #ifdef SERIAL_OUTPUT
     Serial.println("time.txt: ");
     readFileToSerial("time.txt");
     Serial.println("T_in.txt: ");
     readFileToSerial("T_in.txt");
     Serial.println("T_out.txt: ");
     readFileToSerial("T_out.txt");
+    #endif
   }
   else {
     SDCardExists = false;
@@ -249,7 +272,9 @@ void triggerLCD()
 
 void setup()
 {
+  #ifdef SERIAL_OUTPUT
   Serial.begin(9600);
+  #endif
 
   // Initialize the lcd with backlight on
   lcd.init();
@@ -259,10 +284,12 @@ void setup()
 
   // Set RTC sync
   setSyncProvider(RTC.get); // get time from Real Time Clock
+  #ifdef SERIAL_OUTPUT
   if(timeStatus()!= timeSet)
     Serial.println("Unable to sync with the RTC");
   else
     Serial.println("RTC has set the system time");
+  #endif
 
   // Since we're using a filter call update several times to populate
   for (int i = 0; i < 50; ++i)
@@ -314,7 +341,9 @@ void loop()
   // Called like this to avoid SPI bus collision between SD & LCD
   if (trigger_logging)
   {
+    #ifdef SERIAL_OUTPUT
     Serial.println("Trigger Button");
+    #endif
     recordData();
     delay(250);
     lcd.clear();
