@@ -11,26 +11,39 @@ The circuit:
 filename has to be short :\ *NOTE*
 
 */
+
+// SD storage stuff
 #include <SD.h> // Modified SD.cpp in SD library to allow for multiple SD.begin() calls
 // Add to Line 343 of SD.cpp: 'if (root.isOpen()) {root.close();}'
 
+// RTC Timer stuff
 #include <Time.h>
 #include <TimeAlarms.h>
 #include <Wire.h>
 #include <DS1307RTC.h>
 
+// Thermistor stuff
 #include <ThermistorSensor.h>
+
+// LCD stuff
+#include <LiquidCrystal_I2C.h>
 
 // Thermistor Setup
 // which analog pins to connect
-#define THERMISTOR_PIN_A A0
-#define THERMISTOR_PIN_B A1
+#define THERMISTOR_PIN_A A0 // Indoor
+#define THERMISTOR_PIN_B A1 // Outdoor
+
+LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+char lcd_line_buffer[17]; // Single line buffer for writing to LCD
+
+
+int tempA;
+int tempB;
 
 // Thermistor objects and temperature variables
 ThermistorSensor thermistorA(THERMISTOR_PIN_A);
 ThermistorSensor thermistorB(THERMISTOR_PIN_B);
 
-#define FILENAME "mtest.txt"
 File myFile;
 
 void readFileToSerial(char* filename)
@@ -53,8 +66,6 @@ void readFileToSerial(char* filename)
     Serial.println("error opening for reading");
   }
 }
-
-int counter = 0;
 
 // Append int value to file
 void logToFile(char* filename, int value)
@@ -112,7 +123,7 @@ void logTimeToFile(char* filename)
     myFile.print(" ");
     myFile.print(hour());
     myFile.print(" ");
-    myFile.print(minute());
+    myFile.println(minute());
     myFile.close();
     
     Serial.println("done.");
@@ -139,10 +150,16 @@ boolean startSD()
   return true;
 }
 
-boolean buttonPressed = false;
+boolean trigger_button = false;
 void buttonInterrupt()
 {
-  buttonPressed = true;
+  trigger_button = true;
+}
+
+void updateTemperatures()
+{
+  tempA = thermistorA.getReading();
+  tempB = thermistorB.getReading();
 }
 
 // Read and record data to log files
@@ -153,8 +170,7 @@ void recordData()
   if (startSD())
   {
     // Read thermistors
-    int tempA = thermistorA.getReading();
-    int tempB = thermistorB.getReading();
+    updateTemperatures();
 
     // Log Time & Temperature
     logTimeToFile("time.txt");
@@ -168,34 +184,92 @@ void recordData()
     Serial.println("T_out.txt: ");
     readFileToSerial("T_out.txt");
   }
-  buttonPressed = false;
+  trigger_button = false;
 
+}
+
+boolean trigger_lcd = false;
+
+// void updateLCD()
+// {
+//   sprintf(lcd_line_buffer, "%2d/%02d %02d:%02d:%02d", 
+//     month(), day(), hour(), minute(), second());
+//   // lcd.clear();
+//   lcd.setCursor(0,0);
+//   lcd.print(lcd_line_buffer);
+
+//   sprintf(lcd_line_buffer, "IN: %2d, OUT: %3d", 
+//     tempA, tempB);
+//   lcd.setCursor(0,1);
+//   lcd.print(lcd_line_buffer);
+
+//   // LCD refreshed, clear update bit
+//   trigger_lcd = false;
+// }
+
+
+void triggerLCD()
+{
+  trigger_lcd = true;
 }
 
 void setup()
 {
   Serial.begin(9600);
+
+  // Initialize the lcd with backlight on
+  lcd.init();
+  lcd.backlight();
+  lcd.print("Initializing...");
+
+
+  // Set RTC sync
   setSyncProvider(RTC.get); // get time from Real Time Clock
   if(timeStatus()!= timeSet)
     Serial.println("Unable to sync with the RTC");
   else
     Serial.println("RTC has set the system time");
 
+  updateTemperatures();
+
   // Set button to write to file
   attachInterrupt(0, buttonInterrupt, RISING);
 
   // Set call to update files every minute
-  Alarm.timerRepeat(10, recordData);
+  Alarm.timerRepeat(60, buttonInterrupt);
+
+  // Update LCD screenevery second (avoid SPI collision)
+  // Alarm.timerRepeat(1, triggerLCD);
+
+  // Done
+  lcd.setCursor(0,1);
+  lcd.print("Initialized.");
+  delay(500);
+  lcd.clear();
 }
 
 void loop()
 {
-  if (buttonPressed)
+  // Called like this to avoid SPI bus collision between SD & LCD
+  if (trigger_button)
   {
+    Serial.println("Trigger Button");
     recordData();
+    delay(1000);
+    lcd.clear();
+    lcd.print("Data Logged");
+    delay(1000);
   }
 
-  Alarm.delay(1000); // Check every second
+  // if (trigger_lcd)
+  // {
+  //   Serial.println("Trigger LCD");
+  //   updateTemperatures();
+  //   updateLCD();
+  //   delay(10);
+  // }
+
+  Alarm.delay(500); // Check every second
 }
 
 
