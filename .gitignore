@@ -1,0 +1,9 @@
+# ignore images
+*.png
+*.jpg
+
+# ignore python compiled/dlls etc.
+*.py[cod]
+
+# ignore data TXT files
+*.TXT
