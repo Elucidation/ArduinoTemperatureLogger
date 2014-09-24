@@ -36,15 +36,33 @@ filename has to be short :\ *NOTE*
 LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
 char lcd_line_buffer[17]; // Single line buffer for writing to LCD
 
+boolean SDCardExists = false; // used for LCD display purposes
 
-int tempA;
-int tempB;
+float tempA;
+float tempB;
 
 // Thermistor objects and temperature variables
 ThermistorSensor thermistorA(THERMISTOR_PIN_A);
 ThermistorSensor thermistorB(THERMISTOR_PIN_B);
 
 File myFile;
+
+int leadZero(int value)
+{
+  return value;
+}
+
+// Prints input integers with leading zeros up to 2
+void lcdPrintLeadingZerosInt(int value)
+{
+  if (value >= 10)
+    lcd.print(value);
+  else
+  {
+    lcd.print("0");
+    lcd.print(value);
+  }
+}
 
 void readFileToSerial(char* filename)
 {
@@ -67,8 +85,8 @@ void readFileToSerial(char* filename)
   }
 }
 
-// Append int value to file
-void logToFile(char* filename, int value)
+// Append float value to file
+void logToFile(char* filename, float value)
 {
   // open the file. note that only one file can be open at a time,
   // so you have to close this one before opening another.
@@ -158,17 +176,20 @@ void buttonInterrupt()
 
 void updateTemperatures()
 {
-  tempA = thermistorA.getReading();
-  tempB = thermistorB.getReading();
+  // tempA = thermistorA.getReading();
+  // tempB = thermistorB.getReading();
+  tempA = thermistorA.getFilteredReading();
+  tempB = thermistorB.getFilteredReading();
 }
 
 // Read and record data to log files
 void recordData()
 {
-  delay(250);
+  Alarm.delay(250);
   Serial.println("Woo");
   if (startSD())
   {
+    SDCardExists = true;
     // Read thermistors
     updateTemperatures();
 
@@ -184,28 +205,42 @@ void recordData()
     Serial.println("T_out.txt: ");
     readFileToSerial("T_out.txt");
   }
-  trigger_button = false;
-
+  else {
+    SDCardExists = false;
+  }
 }
 
 boolean trigger_lcd = false;
 
-// void updateLCD()
-// {
-//   sprintf(lcd_line_buffer, "%2d/%02d %02d:%02d:%02d", 
-//     month(), day(), hour(), minute(), second());
-//   // lcd.clear();
-//   lcd.setCursor(0,0);
-//   lcd.print(lcd_line_buffer);
+void updateLCD()
+{
+  // Don't use sprintf or memory issues break SD card usage :(
+  // sprintf(lcd_line_buffer, "%2d/%02d %02d:%02d:%02d", 
+  //   month(), day(), hour(), minute(), second());
+  // lcd.clear();
+  lcd.setCursor(0,0);
+  lcdPrintLeadingZerosInt( month() );
+  lcd.print("/");
+  lcdPrintLeadingZerosInt( day() );
+  lcd.print(" ");
 
-//   sprintf(lcd_line_buffer, "IN: %2d, OUT: %3d", 
-//     tempA, tempB);
-//   lcd.setCursor(0,1);
-//   lcd.print(lcd_line_buffer);
+  lcdPrintLeadingZerosInt( hour() );
+  lcd.print(":");
+  lcdPrintLeadingZerosInt( minute() );
+  lcd.print(":");
+  lcdPrintLeadingZerosInt( second() );
 
-//   // LCD refreshed, clear update bit
-//   trigger_lcd = false;
-// }
+  // sprintf(lcd_line_buffer, "I: %2d, O: %3d", 
+  //   tempA, tempB);
+  lcd.setCursor(0,1);
+  lcd.print("I/O ");
+  lcd.print(tempA,1);
+  // lcd.print((char)223);
+  lcd.print(" ");
+  lcd.print(tempB,1);
+  lcd.print((char)223);
+  lcd.print("C    ");
+}
 
 
 void triggerLCD()
@@ -238,13 +273,13 @@ void setup()
   // Set call to update files every minute
   Alarm.timerRepeat(60, buttonInterrupt);
 
-  // Update LCD screenevery second (avoid SPI collision)
-  // Alarm.timerRepeat(1, triggerLCD);
+  // Update LCD screenevery second
+  Alarm.timerRepeat(1, triggerLCD);
 
   // Done
   lcd.setCursor(0,1);
   lcd.print("Initialized.");
-  delay(500);
+  Alarm.delay(500);
   lcd.clear();
 }
 
@@ -255,19 +290,26 @@ void loop()
   {
     Serial.println("Trigger Button");
     recordData();
-    delay(1000);
+    Alarm.delay(250);
     lcd.clear();
-    lcd.print("Data Logged");
-    delay(1000);
+    if (SDCardExists)
+      lcd.print("Data Logged");
+    else
+      lcd.print("No SD Card");
+    Alarm.delay(500);
+
+    trigger_button = false;
   }
 
-  // if (trigger_lcd)
-  // {
-  //   Serial.println("Trigger LCD");
-  //   updateTemperatures();
-  //   updateLCD();
-  //   delay(10);
-  // }
+  if (trigger_lcd)
+  {
+    // Serial.println("Trigger LCD");
+    updateTemperatures();
+    updateLCD();
+    Alarm.delay(10);
+
+    trigger_lcd = false;
+  }
 
   Alarm.delay(500); // Check every second
 }
