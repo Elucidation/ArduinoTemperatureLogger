@@ -1,5 +1,7 @@
 Home Monitoring System
 ---
+[Back](http://i.imgur.com/YuKUFgp.jpg)
+[Front](http://i.imgur.com/vjhCd4o)
 
 Requirements
 ---
@@ -11,14 +13,3 @@ Requirements
 Desirements
 ---
 * Display logged temperature in graph format
-
-
-
-
-
-loop()
-{
-if minute has passed:
-measureData();
-logToSD();
-}
