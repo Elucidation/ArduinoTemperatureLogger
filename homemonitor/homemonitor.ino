@@ -18,7 +18,6 @@ filename has to be short :\ *NOTE*
 
 // RTC Timer stuff
 #include <Time.h>
-#include <TimeAlarms.h>
 #include <Wire.h>
 #include <DS1307RTC.h>
 
@@ -168,10 +167,10 @@ boolean startSD()
   return true;
 }
 
-boolean trigger_button = false;
+boolean trigger_logging = false;
 void buttonInterrupt()
 {
-  trigger_button = true;
+  trigger_logging = true;
 }
 
 void updateTemperatures()
@@ -185,7 +184,7 @@ void updateTemperatures()
 // Read and record data to log files
 void recordData()
 {
-  Alarm.delay(250);
+  delay(250);
   Serial.println("Woo");
   if (startSD())
   {
@@ -265,53 +264,80 @@ void setup()
   else
     Serial.println("RTC has set the system time");
 
-  updateTemperatures();
+  // Since we're using a filter call update several times to populate
+  for (int i = 0; i < 50; ++i)
+  {
+    updateTemperatures();
+    delay(20);
+  }
 
   // Set button to write to file
   attachInterrupt(0, buttonInterrupt, RISING);
 
   // Set call to update files every minute
-  Alarm.timerRepeat(60, buttonInterrupt);
+  // Alarm.timerRepeat(60, buttonInterrupt);
 
   // Update LCD screenevery second
-  Alarm.timerRepeat(1, triggerLCD);
+  // Alarm.timerRepeat(1, triggerLCD);
 
   // Done
   lcd.setCursor(0,1);
   lcd.print("Initialized.");
-  Alarm.delay(500);
+  delay(500);
   lcd.clear();
 }
 
+int lastMinute = -1;
+int lastSecond = -1;
 void loop()
 {
+  //////////////////////////
+  // Update Triggers
+  // Manual triggers instead of alarm on minute/second edges
+
+  // Manually trigger SD logging on new minute
+  if (minute() != lastMinute)
+  {
+    lastMinute = minute();
+    trigger_logging = true;
+  }
+
+  // Manually trigger LCD refresh on new second
+  if (second() != lastSecond)
+  {
+    lastSecond = second();
+    trigger_lcd = true;
+  }
+
+  ///////////////////////////
+  // Check Triggers
   // Called like this to avoid SPI bus collision between SD & LCD
-  if (trigger_button)
+  if (trigger_logging)
   {
     Serial.println("Trigger Button");
     recordData();
-    Alarm.delay(250);
+    delay(250);
     lcd.clear();
     if (SDCardExists)
       lcd.print("Data Logged");
     else
       lcd.print("No SD Card");
-    Alarm.delay(500);
+    delay(500);
 
-    trigger_button = false;
+    trigger_logging = false;
   }
 
   if (trigger_lcd)
   {
     // Serial.println("Trigger LCD");
-    updateTemperatures();
     updateLCD();
-    Alarm.delay(10);
+    delay(10);
 
     trigger_lcd = false;
   }
 
-  Alarm.delay(500); // Check every second
+  updateTemperatures(); // Updates every loop ~ 10Hz if delay below is 100
+  delay(100);
 }
 
 
