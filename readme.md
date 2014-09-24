@@ -1,7 +1,7 @@
 Home Monitoring System
 ---
-[Back](http://i.imgur.com/YuKUFgp.jpg)
-[Front](http://i.imgur.com/vjhCd4o)
+![Back](http://i.imgur.com/YuKUFgp.jpg)
+![Front](http://i.imgur.com/vjhCd4o)
 
 Requirements
 ---
