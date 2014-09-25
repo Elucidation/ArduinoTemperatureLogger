@@ -4,6 +4,7 @@ import matplotlib.ticker as ticker
 from matplotlib.dates import DateFormatter
 from datetime import datetime as dt
 # Load data
+print("Loading data...")
 times = np.loadtxt('time.txt', dtype=int) # timestamps
 N = times.shape[0] # Number of data points
 temp_outside = np.loadtxt('t_out.txt', dtype=float) # indoor temperature
@@ -13,9 +14,9 @@ dates = np.zeros((N,1), dtype=dt)
 for i in xrange(N):
   dates[i] = dt(2014, times[i,0], times[i,1], times[i,2], times[i,3])
 
-
+print("Generating Plot...")
 plt.plot(dates, temp_outside, 'b.-', dates, temp_inside, 'r.-');
-plt.legend(["Indoor", "Outdoor"]);
+plt.legend(["Outdoor", "Indoor"], loc=4);
 plt.xlabel('Date Time (PST)');
 plt.ylabel('Temperature (*C)');
 plt.title('Apartment Indoor/Outdoor Temperatures');
@@ -25,6 +26,7 @@ formatter = DateFormatter('%m/%d %H:%M')
 plt.gcf().axes[0].xaxis.set_major_formatter(formatter)
 # plt.show()
 plt.savefig('temperatures.png')
+print("Finished.")
 
 # # Generate dates
 # dates = zeros(N,1);
