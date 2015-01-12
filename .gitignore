@@ -7,3 +7,6 @@
 
 # ignore data TXT files
 *.TXT
+
+# ignore windows temp files
+~*

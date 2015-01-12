@@ -15,7 +15,7 @@ for i in xrange(N):
   dates[i] = dt(2014, times[i,0], times[i,1], times[i,2], times[i,3])
 
 print("Generating Plot...")
-plt.plot(dates, temp_outside, 'b.-', dates, temp_inside, 'r.-');
+plt.plot(dates, temp_outside, 'b-', dates, temp_inside, 'r-');
 plt.legend(["Outdoor", "Indoor"], loc=4);
 plt.xlabel('Date Time (PST)');
 plt.ylabel('Temperature (*C)');
@@ -23,9 +23,16 @@ plt.title('Apartment Indoor/Outdoor Temperatures');
 
 
 formatter = DateFormatter('%m/%d %H:%M')
-plt.gcf().axes[0].xaxis.set_major_formatter(formatter)
+fig = plt.gcf()
+fig.axes[0].xaxis.set_major_formatter(formatter)
 # plt.show()
-plt.savefig('temperatures.png')
+
+ax = plt = plt.gca()
+ax.grid(True)
+
+fig.set_size_inches(18.5,10.5)
+fig.savefig('temperatures.png',dpi=100)
+# plt.savefig('temperatures.png')
 print("Finished.")
 
 # # Generate dates
