@@ -3,127 +3,136 @@
 #include <Process.h>
 #include <FileIO.h>
 #include <Time.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 dht DHT;
 
 //#define DO_LOGGING
 #define FILE_PATH ("/mnt/sd/datalog.txt")
 
+// Pins 2/3 are hardwired for I2C on the Arduino Yun
+#define DHT22_PIN 4
+#define DHT11_PIN 5
+#define DHT22_PIN_B 6
 
-#define DHT22_PIN 2
-#define DHT11_PIN 3
-#define DHT22_PIN_B 4
 
+Process date; // process used to get the date
+String dateTimeString; // string holding process returned date and time
 
-Process date;                 // process used to get the date
-String dateTimeString;
+// Used for main loop timing purposes
+int last_second = -1;
 int last_minute = -1;
+int last_hour = -1;
+int last_sensor_read_time = -1;
 
 // Sensor results arrays
 // [DHT22 Outdoor, DHT11 Indoor, DHT22 Indoor]
 double humidity[3]; // Humidity in %
 double temp[3]; // Temperatures in celsius
 
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
 void setup()
 {
   Bridge.begin();
-    Console.begin();
-    FileSystem.begin();
-    while (!Console){
-      ; // wait for Console port to connect.
-    }
-    Console.println("Arduino Yun Home Monitor");
-    Console.println();
-    Console.println("Temp/Humidity Logging using DHT sensors");
-    Console.print("DHT LIBRARY VERSION: ");
-    Console.println(DHT_LIB_VERSION);
+  Console.begin();
+  FileSystem.begin();
+
+  lcd.init();
+  lcd.backlight();
+
+  // lcd.clear();
+  // lcd.print("Waiting for");
+  // lcd.setCursor(0, 1);
+  // lcd.print("console...");
+
+  // while (!Console){
+  //   ; // wait for Console port to connect.
+  // }
+
+  lcd.clear();
+  lcd.print("  Arduino Yun   ");
+  lcd.setCursor(0,1);
+  lcd.print("  Home Monitor  ");
+  delay(1000);
+
+  
+  Console.println("Arduino Yun Home Monitor");
+  Console.println();
+
+  
+
+  Console.println("Temp/Humidity Logging using DHT sensors");
+  Console.print("DHT LIBRARY VERSION: ");
+  Console.println(DHT_LIB_VERSION);
 #ifdef DO_LOGGING
-    Console.println("Logging Enabled");
-    Console.print("Logging to");
-    Console.println(FILE_PATH);
+  Console.println("Logging Enabled");
+  Console.print("Logging to");
+  Console.println(FILE_PATH);
 #else
-    Console.println("Logging Disabled");
+  Console.println("Logging Disabled");
 #endif
 
-    // Update time  from server, and there-after every new day 
-    updateTimeFromServer(); // ~1.16s
-    Console.print("Current time Set to: ");
-    displayCurrentTime();
-
-    
-    Console.println();
-    Console.println("Date\tA-Humidity(%),\tA-Temp(C)\tB-Humidity(%),\tB-Temp(C)\tC-Humidity(%),\tC-Temp(C)");
-
+  // Update time  from server, and there-after every X 
+  updateTimeFromServer(); // ~1.16s
+  Console.print("Current time Set to: ");
+  displayCurrentTime();
+  Console.println("------");
 }
 
-
-
-void logToFile()
-{
-  File dataFile = FileSystem.open(FILE_PATH, FILE_APPEND);
-    if (dataFile) {    
-      dataFile.print(dateTimeString);
-      dataFile.print("\t");
-      dataFile.print(humidity[0],1);
-      dataFile.print("\t");
-      dataFile.print(temp[0],1);
-      dataFile.print("\t");
-      dataFile.print(humidity[1],1);
-      dataFile.print("\t");
-      dataFile.print(temp[1],1);
-      dataFile.print("\t");
-      dataFile.print(humidity[2],1);
-      dataFile.print("\t");
-      dataFile.print(temp[2],1);
-      dataFile.println();
-
-      dataFile.close();
-
-      Console.print("Logged: ");
-      Console.print(dateTimeString);
-      Console.print("\t");
-      Console.print(humidity[0],1);
-      Console.print("\t");
-      Console.print(temp[0],1);
-      Console.print("\t");
-      Console.print(humidity[1],1);
-      Console.print("\t");
-      Console.print(temp[1],1);
-      Console.print("\t");
-      Console.print(humidity[2],1);
-      Console.print("\t");
-      Console.print(temp[2],1);
-      Console.println();
-    }
-    else
-    {
-      Console.println("error opening logfile");
-    }
-}
-
+// Run loop at 10Hz
+#define LOOP_RATE 100 // ms delay (1/LOOP_RATE = Frequency in Hz)
 
 void loop()
 {
-  displayCurrentTime();
+  // Things in loop can take longer than a second, so keep track of start second
+  int second_now = second();
 
-  if (second() % 10 == 0) // Every minute
+  //// EVERY SECOND
+  // Display time every second
+  if (second_now != last_second)
+  {
+    last_second = second_now;
+
+    displayCurrentTime();
+
+    updateLCD();
+  }
+
+  //// EVERY 10 SECONDS
+  // Read sensors every 10 seconds
+  if (second_now % 10 == 0 && second_now != last_sensor_read_time)
+  {
+    last_sensor_read_time = second_now; // To avoid multiple hits in same second
+    readData();
+    displayCurrentData();
+  }
+
+  //// EVERY MINUTE
+  // Log data every minute
+  if (minute() != last_minute)
   {
     last_minute = minute();
-
-    readData();    
 
 #ifdef DO_LOGGING
     // Append data to file
     logToFile();
 #endif
+  }
 
-    // Display updated temperatures
+  //// EVERY HOUR
+  // Resync with linux clock every hour
+  if (hour() != last_hour)
+  {
+    last_hour = hour();
+    updateTimeFromServer(); // ~1.16s
+    Console.print("Current time Set to: ");
     displayCurrentTime();
-    displayCurrentData();
 
   }
 
-  delay(1000); // Check every second
+  delay(LOOP_RATE); // Rate-limit main loop
 }
 
 
@@ -168,6 +177,98 @@ void readData()
       humidity[2] = -1E100;
       temp[2] = -1E100;
     }
+}
+
+// Store data on file : TODO Save to separate file each day
+void logToFile()
+{
+  File dataFile = FileSystem.open(FILE_PATH, FILE_APPEND);
+    if (dataFile) {    
+      dataFile.print(dateTimeString);
+      dataFile.print("\t");
+      dataFile.print(humidity[0],1);
+      dataFile.print("\t");
+      dataFile.print(temp[0],1);
+      dataFile.print("\t");
+      dataFile.print(humidity[1],1);
+      dataFile.print("\t");
+      dataFile.print(temp[1],1);
+      dataFile.print("\t");
+      dataFile.print(humidity[2],1);
+      dataFile.print("\t");
+      dataFile.print(temp[2],1);
+      dataFile.println();
+
+      dataFile.close();
+
+      Console.print("Logged: ");
+      Console.print(dateTimeString);
+      Console.print("\t");
+      Console.print(humidity[0],1);
+      Console.print("\t");
+      Console.print(temp[0],1);
+      Console.print("\t");
+      Console.print(humidity[1],1);
+      Console.print("\t");
+      Console.print(temp[1],1);
+      Console.print("\t");
+      Console.print(humidity[2],1);
+      Console.print("\t");
+      Console.print(temp[2],1);
+      Console.println();
+    }
+    else
+    {
+      Console.println("error opening logfile");
+    }
+}
+
+
+void updateLCD()
+{
+  lcd.setCursor(0,0);
+  lcdPrintLeadingZeroInt(month());
+  lcd.print("/");
+  lcdPrintLeadingZeroInt(day());
+  lcd.print("   ");
+  lcdPrintLeadingZeroInt(hour());
+  lcd.print(":");
+  lcdPrintLeadingZeroInt(minute());
+  lcd.print(":");
+  lcdPrintLeadingZeroInt(second());
+
+  if ((second()/5) % 2 == 0) // switch every 5 seconds
+  {
+    lcd.setCursor(0, 1);
+    lcd.print("OUT "); // Out
+    lcd.print(temp[0],1);
+    lcd.print((char)223);
+    lcd.print("C ");
+    lcd.print(humidity[0],1);
+    lcd.print("%");
+  }
+  else
+  {
+    lcd.setCursor(0, 1);
+    lcd.print("IN  "); // In
+    lcd.print(temp[2],1);
+    lcd.print((char)223);
+    lcd.print("C ");
+    lcd.print(humidity[2],1);
+    lcd.print("%");
+  }
+}
+
+// Prints input integer with a leading zero if < 10
+void lcdPrintLeadingZeroInt(int value)
+{
+  if (value >= 10)
+    lcd.print(value);
+  else
+  {
+    lcd.print("0");
+    lcd.print(value);
+  }
 }
 
 // Displays sensor values on Console
@@ -225,7 +326,6 @@ void updateTimeFromServer()
             dayString.toInt(), monthString.toInt(), yearString.toInt());
   } 
 }
-
 
 void displayCurrentTime()
 {
