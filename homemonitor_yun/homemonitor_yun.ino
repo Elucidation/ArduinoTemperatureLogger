@@ -8,8 +8,11 @@
 
 dht DHT;
 
-//#define DO_LOGGING
-#define FILE_PATH ("/mnt/sd/datalog.txt")
+// Uncomment DO_LOGGING to enable logging data to SD card
+#define DO_LOGGING 
+
+
+#define FILE_DIRECTORY "/mnt/sd/"
 
 // Pins 2/3 are hardwired for I2C on the Arduino Yun
 #define DHT22_PIN 4
@@ -19,11 +22,17 @@ dht DHT;
 
 Process date; // process used to get the date
 String dateTimeString; // string holding process returned date and time
+String datestring; // Used by file writer/LCD for formatting
+
+#define MAX_FILEPATH_LENGTH 50
+static char filePath[MAX_FILEPATH_LENGTH];
+String filename;
 
 // Used for main loop timing purposes
 int last_second = -1;
 int last_minute = -1;
 int last_hour = -1;
+int last_day = -1;
 int last_sensor_read_time = -1;
 
 // Sensor results arrays
@@ -37,8 +46,11 @@ void setup()
 {
   Bridge.begin();
   Console.begin();
+#ifdef DO_LOGGING
   FileSystem.begin();
-
+  filename.reserve(MAX_FILEPATH_LENGTH);
+  datestring.reserve(20);
+#endif
   lcd.init();
   lcd.backlight();
 
@@ -66,18 +78,30 @@ void setup()
   Console.println("Temp/Humidity Logging using DHT sensors");
   Console.print("DHT LIBRARY VERSION: ");
   Console.println(DHT_LIB_VERSION);
-#ifdef DO_LOGGING
-  Console.println("Logging Enabled");
-  Console.print("Logging to");
-  Console.println(FILE_PATH);
-#else
-  Console.println("Logging Disabled");
-#endif
 
   // Update time  from server, and there-after every X 
   updateTimeFromServer(); // ~1.16s
   Console.print("Current time Set to: ");
   displayCurrentTime();
+
+#ifdef DO_LOGGING
+  Console.println("Logging Enabled");
+  Console.print("Logging to");
+  Console.println(FILE_DIRECTORY);
+
+  // Set filename to record to
+  getFilename();
+  Console.print("Filename set to: ");
+  Console.println(filePath);
+  lcd.print("Filename set to:");
+  lcd.setCursor(0, 1);
+  lcd.print(filename.substring(8)); // Assuming 8 chars is length of FILE_DIRECTORY
+  delay(2000);
+
+#else
+  Console.println("Logging Disabled");
+#endif
+
   Console.println("------");
 }
 
@@ -99,6 +123,24 @@ void loop()
 
     updateLCD();
   }
+
+  //// EVERY DAY (Update Filename here before writing etc.)
+  if (day() != last_day)
+  {
+    last_day = day();
+#ifdef DO_LOGGING
+    getFilename();
+    Console.print("Filename set to: ");
+    Console.println(filePath);
+
+    lcd.clear();
+    lcd.print("Filename set to:");
+    lcd.setCursor(0, 1);
+    lcd.print(filename.substring(8)); // Assuming 8 chars is length of FILE_DIRECTORY
+    delay(2000);
+#endif
+  }
+
 
   //// EVERY 10 SECONDS
   // Read sensors every 10 seconds
@@ -179,49 +221,105 @@ void readData()
     }
 }
 
+#ifdef DO_LOGGING
+
+// Restriction on filename length is 8 chars not including extension for FAT?
+// Readings_018.txt is what seems to get generated, so maybe 12 chars
+void getFilename()
+{
+  filename = FILE_DIRECTORY;
+  filename += 'R';
+  
+  filename += year();
+  filename += '_';
+  
+  if (month() < 10) {filename += '0';}
+  filename += month();
+  filename += '_';
+  
+  if (day() < 10) {filename += '0';}
+  filename += day();
+
+  filename += ".txt";
+
+  // Push to filePath char array
+  filename.toCharArray(filePath, MAX_FILEPATH_LENGTH);
+}
+
 // Store data on file : TODO Save to separate file each day
 void logToFile()
 {
-  File dataFile = FileSystem.open(FILE_PATH, FILE_APPEND);
-    if (dataFile) {    
-      dataFile.print(dateTimeString);
-      dataFile.print("\t");
-      dataFile.print(humidity[0],1);
-      dataFile.print("\t");
-      dataFile.print(temp[0],1);
-      dataFile.print("\t");
-      dataFile.print(humidity[1],1);
-      dataFile.print("\t");
-      dataFile.print(temp[1],1);
-      dataFile.print("\t");
-      dataFile.print(humidity[2],1);
-      dataFile.print("\t");
-      dataFile.print(temp[2],1);
-      dataFile.println();
+  File dataFile = FileSystem.open(filePath, FILE_APPEND);
+  datestring = "";
+  datestring += year();
+  datestring += '/';
+  if (month() < 10) {datestring += '0';}
+  datestring += month();
+  datestring += '/';
+  
+  if (day() < 10) {datestring += '0';}
+  datestring += day();
+  datestring += ' ';
 
-      dataFile.close();
+  if (hour() < 10) {datestring += '0';}
+  datestring += hour();
+  datestring += ':';
 
-      Console.print("Logged: ");
-      Console.print(dateTimeString);
-      Console.print("\t");
-      Console.print(humidity[0],1);
-      Console.print("\t");
-      Console.print(temp[0],1);
-      Console.print("\t");
-      Console.print(humidity[1],1);
-      Console.print("\t");
-      Console.print(temp[1],1);
-      Console.print("\t");
-      Console.print(humidity[2],1);
-      Console.print("\t");
-      Console.print(temp[2],1);
-      Console.println();
-    }
-    else
-    {
-      Console.println("error opening logfile");
-    }
+  if (minute() < 10) {datestring += '0';}
+  datestring += minute();
+
+  if (dataFile) {    
+    dataFile.print(datestring);
+    dataFile.print("\t");
+    dataFile.print(humidity[0],1);
+    dataFile.print("\t");
+    dataFile.print(temp[0],1);
+    dataFile.print("\t");
+    dataFile.print(humidity[1],1);
+    dataFile.print("\t");
+    dataFile.print(temp[1],1);
+    dataFile.print("\t");
+    dataFile.print(humidity[2],1);
+    dataFile.print("\t");
+    dataFile.print(temp[2],1);
+    dataFile.println();
+
+    dataFile.close();
+
+    Console.print("Logged to ");
+    Console.print(filePath);
+    Console.print(": ");
+
+    Console.print(datestring);
+    Console.print("\t");
+    Console.print(humidity[0],1);
+    Console.print("\t");
+    Console.print(temp[0],1);
+    Console.print("\t");
+    Console.print(humidity[1],1);
+    Console.print("\t");
+    Console.print(temp[1],1);
+    Console.print("\t");
+    Console.print(humidity[2],1);
+    Console.print("\t");
+    Console.print(temp[2],1);
+    Console.println();
+  }
+  else
+  {
+    Console.print("Error opening ");
+    Console.println(filePath);
+
+    lcd.clear();
+    lcd.print("SD Write Error");
+    lcd.setCursor(0,1);
+    lcd.print(filePath);
+    lcd.print("SD Write Error");
+    
+    delay(2000);
+  }
 }
+#endif
 
 
 void updateLCD()
