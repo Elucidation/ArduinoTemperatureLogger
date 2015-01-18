@@ -160,6 +160,9 @@ void loop()
 #ifdef DO_LOGGING
     // Append data to file
     logToFile();
+
+    lcd.setCursor(0,0);
+    lcd.print("LOGGED"); // This will get overwritten by next second
 #endif
   }
 
@@ -313,8 +316,7 @@ void logToFile()
     lcd.clear();
     lcd.print("SD Write Error");
     lcd.setCursor(0,1);
-    lcd.print(filePath);
-    lcd.print("SD Write Error");
+    lcd.print(filename.substring(8)); // Assuming 8 chars is length of FILE_DIRECTORY
     
     delay(2000);
   }
