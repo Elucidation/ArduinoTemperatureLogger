@@ -91,6 +91,7 @@ void setup()
 
   // Set filename to record to
   getFilename();
+  last_minute = minute(); // So we don't immediately write data till next minute
   Console.print("Filename set to: ");
   Console.println(filePath);
   lcd.print("Filename set to:");
