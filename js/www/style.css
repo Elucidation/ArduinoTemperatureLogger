@@ -1,0 +1,46 @@
+body {
+    background-color: white;
+    color: black;
+}
+
+.axis path,
+.axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+}
+
+.axis text {
+    font-family: sans-serif;
+    font-size: 11px;
+}
+
+
+.overlay {
+  fill: none;
+  pointer-events: all;
+}
+
+.focus circle {
+  fill: #8BC34A;
+  r:5px;
+  stroke: red;
+  stroke-width:1px;
+}
+
+.focus line {
+  fill: green;
+  stroke: green;
+}
+
+.focus text {
+  fill: green;
+  /*stroke: darkgray;*/
+  /*stroke-width:1px;*/
+  font-size: 15 px;  
+}
+
+.area {
+  fill: steelblue;
+  clip-path: url(#clip);
+}
