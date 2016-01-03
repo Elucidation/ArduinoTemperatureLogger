@@ -79,11 +79,11 @@ function getTempsInRange_(date_min, date_max, resolution, set_data_fn) {
     timeDelta = 1000*60*60*24;
     console.log("Loading daily.");
     // Just use all the daily since it's only 274 values
-    d3.csv('../csv/R2015_daily.csv', d3_callback);
+    d3.csv('csv/R2015_daily.csv', d3_callback);
   } else if (resolution == DATA_RESOLUTION.hour) {
     timeDelta = 1000*60*60;
     console.log("Loading hourly.");
-    d3.csv('../csv/R2015_hourly.csv', function(dataAll) {
+    d3.csv('csv/R2015_hourly.csv', function(dataAll) {
       // Gets all hourly data, slice up first
       var min_index = bisectDateLow(dataAll, date_min);
       var max_index = bisectDateHigh(dataAll, date_max);
@@ -142,8 +142,8 @@ function loadCombinedMinuteCSVs(date_min, date_max, set_data_fn) {
 
   if (start_filename == end_filename) {
     // 1 day only, no need to merge
-    console.log("Loading single day from:", ('../csv/'+start_filename));
-    d3.csv('../csv/'+start_filename, d3_callback);
+    console.log("Loading single day from:", ('csv/'+start_filename));
+    d3.csv('csv/'+start_filename, d3_callback);
   } else {
     q = queue();
     var sdate = new Date(date_min.getFullYear(), date_min.getMonth(), date_min.getDate()).getTime();
@@ -156,7 +156,7 @@ function loadCombinedMinuteCSVs(date_min, date_max, set_data_fn) {
     } else
     {
       for (var cdate = sdate; cdate <= edate; cdate += oneday) {
-        var currfilename = "../csv/R"+(new Date(cdate)).toString("yyyy_MM_dd")+".csv";
+        var currfilename = "csv/R"+(new Date(cdate)).toString("yyyy_MM_dd")+".csv";
         console.log(" > multiday queue loading", currfilename);
         q.defer(d3.csv, currfilename);
       };
