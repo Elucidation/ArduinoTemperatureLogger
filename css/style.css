@@ -3,6 +3,14 @@ body {
     color: black;
 }
 
+container {
+  margin: auto;
+  height: 600px;
+  min-width: 310px;
+  max-width: 1000px;
+  padding: 10px;
+}
+
 .axis path,
 .axis line {
     fill: none;
